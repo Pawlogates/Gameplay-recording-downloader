@@ -1,32 +1,42 @@
-from flask import Flask, request, send_from_directory
+from flask import Flask, request, send_from_directory, Response, jsonify
 import os
-
 import zipfile
-from flask import Response
 import io
+import hashlib
 
 app = Flask(__name__)
+
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# -------------------------
+# Upload endpoint
+# -------------------------
 @app.route('/upload', methods=['POST'])
 def upload():
     if 'file' not in request.files:
         return 'No file part', 400
+
     f = request.files['file']
     filename = f.filename
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     f.save(file_path)
 
-    # Explicitly print to stdout for Render logs
-    print(f"✅ File received: {filename}")  # This should now show in the logs
-
+    print(f"✅ File received: {filename}")
     return f"Uploaded {filename}", 200
 
+
+# -------------------------
+# Serve individual files
+# -------------------------
 @app.route('/uploads/<filename>')
 def serve_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
+
+# -------------------------
+# Download ALL files as ZIP
+# -------------------------
 @app.route('/download-all')
 def download_all():
     memory_file = io.BytesIO()
@@ -47,9 +57,52 @@ def download_all():
         }
     )
 
+
+# -------------------------
+# Hash of ALL files (change detection)
+# -------------------------
+@app.route('/zip-hash')
+def zip_hash():
+    hash_obj = hashlib.sha256()
+
+    # Sort ensures consistent hash order
+    for filename in sorted(os.listdir(UPLOAD_FOLDER)):
+        path = os.path.join(UPLOAD_FOLDER, filename)
+        if os.path.isfile(path):
+            with open(path, "rb") as f:
+                while True:
+                    chunk = f.read(8192)
+                    if not chunk:
+                        break
+                    hash_obj.update(chunk)
+
+    return jsonify({"hash": hash_obj.hexdigest()})
+
+
+# -------------------------
+# Optional: list files + hashes
+# -------------------------
+@app.route('/list')
+def list_files():
+    result = {}
+    for filename in os.listdir(UPLOAD_FOLDER):
+        path = os.path.join(UPLOAD_FOLDER, filename)
+        if os.path.isfile(path):
+            with open(path, "rb") as f:
+                result[filename] = hashlib.sha256(f.read()).hexdigest()
+    return jsonify(result)
+
+
+# -------------------------
+# Health check
+# -------------------------
 @app.route('/')
 def home():
     return 'Server is running!'
 
+
+# -------------------------
+# Run server
+# -------------------------
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
