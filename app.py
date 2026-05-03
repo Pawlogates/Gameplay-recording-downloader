@@ -4,10 +4,32 @@ import zipfile
 import io
 import hashlib
 
+LEADERBOARD_FOLDER = "leaderboard"
+os.makedirs(LEADERBOARD_FOLDER, exist_ok=True)
+
 app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+@app.route('/leaderboard/list')
+def leaderboard_list():
+	result = {}
+
+	for filename in os.listdir(LEADERBOARD_FOLDER):
+	    path = os.path.join(LEADERBOARD_FOLDER, filename)
+
+		if os.path.isfile(path):
+			with open(path, "rb") as f:
+				result[filename] = hashlib.sha256(f.read()).hexdigest()
+
+	return jsonify(result)
+
+
+@app.route('/leaderboard/<filename>')
+def leaderboard_file(filename):
+	return send_from_directory(LEADERBOARD_FOLDER, filename)
 
 # -------------------------
 # Upload endpoint
