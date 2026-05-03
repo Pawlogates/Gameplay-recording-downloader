@@ -18,7 +18,7 @@ def leaderboard_list():
 	result = {}
 
 	for filename in os.listdir(LEADERBOARD_FOLDER):
-	    path = os.path.join(LEADERBOARD_FOLDER, filename)
+		path = os.path.join(LEADERBOARD_FOLDER, filename)
 
 		if os.path.isfile(path):
 			with open(path, "rb") as f:
@@ -36,7 +36,7 @@ def leaderboard_file(filename):
 # -------------------------
 @app.route('/upload', methods=['POST'])
 def upload():
-    if 'file' not in request.files:
+	if 'file' not in request.files:
         return 'No file part', 400
 
     f = request.files['file']
