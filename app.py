@@ -12,7 +12,19 @@ app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+@app.route('/leaderboard/upload', methods=['POST'])
+def upload_leaderboard():
+	if 'file' not in request.files:
+		return "No file", 400
 
+	file = request.files['file']
+
+	if file.filename == '':
+		return "Empty filename", 400
+
+	file.save(os.path.join(LEADERBOARD_FOLDER, file.filename))
+	return "ok", 200
+	
 @app.route('/leaderboard/list')
 def leaderboard_list():
 	result = {}
@@ -37,15 +49,15 @@ def leaderboard_file(filename):
 @app.route('/upload', methods=['POST'])
 def upload():
 	if 'file' not in request.files:
-        return 'No file part', 400
+		return 'No file part', 400
 
-    f = request.files['file']
-    filename = f.filename
-    file_path = os.path.join(UPLOAD_FOLDER, filename)
-    f.save(file_path)
+	f = request.files['file']
+	filename = f.filename
+	file_path = os.path.join(UPLOAD_FOLDER, filename)
+	f.save(file_path)
 
-    print(f"✅ File received: {filename}")
-    return f"Uploaded {filename}", 200
+	print(f"✅ File received: {filename}")
+	return f"Uploaded {filename}", 200
 
 
 # -------------------------
