@@ -12,6 +12,10 @@ app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+
+# -------------------------
+# Leaderboard upload (FIXED)
+# -------------------------
 @app.route('/leaderboard/upload', methods=['POST'])
 def upload_leaderboard():
     if 'file' not in request.files:
@@ -22,30 +26,34 @@ def upload_leaderboard():
     if file.filename == '':
         return "Empty filename", 400
 
-    filename = file.filename
+    filename = file.filename.strip()
+
+    print(f"\n📥 Incoming file: {filename}")
 
     # --- PARSE FILENAME ---
     try:
-        name, ext = os.path.splitext(filename)
-        parts = name.split("_")
+        parts = filename.split("_")
 
         # playback_<player>_<levelset>_<level>_<attempt>
         if len(parts) < 5:
             return "Invalid filename format", 400
 
-        prefix = "_".join(parts[:-1])  # everything except attempt
+        prefix = "_".join(parts[:-1])
         new_attempt = int(parts[-1])
+
+        print(f"📌 Prefix: {prefix}, Attempt: {new_attempt}")
 
     except Exception:
         return "Filename parsing error", 400
 
     # --- DELETE OLD VERSIONS ---
     for existing in os.listdir(LEADERBOARD_FOLDER):
-        if not existing.endswith(".json"):
+        path = os.path.join(LEADERBOARD_FOLDER, existing)
+
+        if not os.path.isfile(path):
             continue
 
-        existing_name = os.path.splitext(existing)[0]
-        existing_parts = existing_name.split("_")
+        existing_parts = existing.split("_")
 
         if len(existing_parts) < 5:
             continue
@@ -53,15 +61,18 @@ def upload_leaderboard():
         existing_prefix = "_".join(existing_parts[:-1])
 
         if existing_prefix == prefix:
-            existing_attempt = int(existing_parts[-1])
+            try:
+                existing_attempt = int(existing_parts[-1])
+            except ValueError:
+                continue
 
-            # delete older OR equal versions
+            print(f"🔍 Found matching file: {existing}")
+
             if existing_attempt <= new_attempt:
-                os.remove(os.path.join(LEADERBOARD_FOLDER, existing))
+                os.remove(path)
                 print(f"🗑️ Deleted old: {existing}")
-
             else:
-                # if somehow server has a newer one → reject upload
+                print(f"⛔ Newer version already exists: {existing}")
                 return "Newer version already exists", 409
 
     # --- SAVE NEW FILE ---
@@ -70,40 +81,48 @@ def upload_leaderboard():
 
     print(f"✅ Saved: {filename}")
     return "ok", 200
-	
-@app.route('/leaderboard/list')
-def leaderboard_list():
-	result = {}
 
-	for filename in os.listdir(LEADERBOARD_FOLDER):
-		path = os.path.join(LEADERBOARD_FOLDER, filename)
-
-		if os.path.isfile(path):
-			with open(path, "rb") as f:
-				result[filename] = hashlib.sha256(f.read()).hexdigest()
-
-	return jsonify(result)
-
-
-@app.route('/leaderboard/<filename>')
-def leaderboard_file(filename):
-	return send_from_directory(LEADERBOARD_FOLDER, filename)
 
 # -------------------------
-# Upload endpoint
+# Leaderboard list
+# -------------------------
+@app.route('/leaderboard/list')
+def leaderboard_list():
+    result = {}
+
+    for filename in os.listdir(LEADERBOARD_FOLDER):
+        path = os.path.join(LEADERBOARD_FOLDER, filename)
+
+        if os.path.isfile(path):
+            with open(path, "rb") as f:
+                result[filename] = hashlib.sha256(f.read()).hexdigest()
+
+    return jsonify(result)
+
+
+# -------------------------
+# Serve leaderboard file
+# -------------------------
+@app.route('/leaderboard/<filename>')
+def leaderboard_file(filename):
+    return send_from_directory(LEADERBOARD_FOLDER, filename)
+
+
+# -------------------------
+# Raw upload (unchanged)
 # -------------------------
 @app.route('/upload', methods=['POST'])
 def upload():
-	if 'file' not in request.files:
-		return 'No file part', 400
+    if 'file' not in request.files:
+        return 'No file part', 400
 
-	f = request.files['file']
-	filename = f.filename
-	file_path = os.path.join(UPLOAD_FOLDER, filename)
-	f.save(file_path)
+    f = request.files['file']
+    filename = f.filename
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    f.save(file_path)
 
-	print(f"✅ File received: {filename}")
-	return f"Uploaded {filename}", 200
+    print(f"✅ File received: {filename}")
+    return f"Uploaded {filename}", 200
 
 
 # -------------------------
@@ -139,13 +158,12 @@ def download_all():
 
 
 # -------------------------
-# Hash of ALL files (change detection)
+# Hash of ALL files
 # -------------------------
 @app.route('/zip-hash')
 def zip_hash():
     hash_obj = hashlib.sha256()
 
-    # Sort ensures consistent hash order
     for filename in sorted(os.listdir(UPLOAD_FOLDER)):
         path = os.path.join(UPLOAD_FOLDER, filename)
         if os.path.isfile(path):
@@ -160,7 +178,7 @@ def zip_hash():
 
 
 # -------------------------
-# Optional: list files + hashes
+# List files + hashes
 # -------------------------
 @app.route('/list')
 def list_files():
