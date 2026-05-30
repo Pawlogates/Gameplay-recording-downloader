@@ -14,7 +14,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 # -------------------------
-# Leaderboard upload (FIXED)
+# Leaderboard upload (FIXED + ROBUST)
 # -------------------------
 @app.route('/leaderboard/upload', methods=['POST'])
 def upload_leaderboard():
@@ -30,18 +30,24 @@ def upload_leaderboard():
 
     print(f"\n📥 Incoming file: {filename}")
 
-    # --- PARSE FILENAME ---
+    # --- PARSE FILENAME (FROM THE RIGHT) ---
+    parts = filename.split("_")
+
+    if len(parts) < 5:
+        return "Invalid filename format", 400
+
     try:
-        parts = filename.split("_")
-
-        # playback_<player>_<levelset>_<level>_<attempt>
-        if len(parts) < 5:
-            return "Invalid filename format", 400
-
-        prefix = "_".join(parts[:-1])
         new_attempt = int(parts[-1])
+        level = parts[-2]
+        levelset = parts[-3]
+        player = "_".join(parts[1:-3])  # supports underscores in name
 
-        print(f"📌 Prefix: {prefix}, Attempt: {new_attempt}")
+        prefix = f"playback_{player}_{levelset}_{level}"
+
+        print(f"📌 Player: {player}")
+        print(f"📌 Levelset: {levelset}")
+        print(f"📌 Level: {level}")
+        print(f"📌 Attempt: {new_attempt}")
 
     except Exception:
         return "Filename parsing error", 400
@@ -58,21 +64,25 @@ def upload_leaderboard():
         if len(existing_parts) < 5:
             continue
 
-        existing_prefix = "_".join(existing_parts[:-1])
+        try:
+            existing_attempt = int(existing_parts[-1])
+            existing_level = existing_parts[-2]
+            existing_levelset = existing_parts[-3]
+            existing_player = "_".join(existing_parts[1:-3])
+
+            existing_prefix = f"playback_{existing_player}_{existing_levelset}_{existing_level}"
+
+        except Exception:
+            continue
 
         if existing_prefix == prefix:
-            try:
-                existing_attempt = int(existing_parts[-1])
-            except ValueError:
-                continue
-
-            print(f"🔍 Found matching file: {existing}")
+            print(f"🔍 Found match: {existing}")
 
             if existing_attempt <= new_attempt:
                 os.remove(path)
                 print(f"🗑️ Deleted old: {existing}")
             else:
-                print(f"⛔ Newer version already exists: {existing}")
+                print(f"⛔ Newer version exists: {existing}")
                 return "Newer version already exists", 409
 
     # --- SAVE NEW FILE ---
