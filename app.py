@@ -14,7 +14,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 # -------------------------
-# Leaderboard upload (FIXED + ROBUST)
+# Leaderboard upload (ALWAYS REPLACE)
 # -------------------------
 @app.route('/leaderboard/upload', methods=['POST'])
 def upload_leaderboard():
@@ -37,22 +37,22 @@ def upload_leaderboard():
         return "Invalid filename format", 400
 
     try:
-        new_attempt = int(parts[-1])
+        attempt = parts[-1]
         level = parts[-2]
         levelset = parts[-3]
-        player = "_".join(parts[1:-3])  # supports underscores in name
+        player = "_".join(parts[1:-3])
 
         prefix = f"playback_{player}_{levelset}_{level}"
 
         print(f"📌 Player: {player}")
         print(f"📌 Levelset: {levelset}")
         print(f"📌 Level: {level}")
-        print(f"📌 Attempt: {new_attempt}")
+        print(f"📌 Attempt: {attempt}")
 
     except Exception:
         return "Filename parsing error", 400
 
-    # --- DELETE OLD VERSIONS ---
+    # --- DELETE ALL OLD VERSIONS (NO COMPARISON) ---
     for existing in os.listdir(LEADERBOARD_FOLDER):
         path = os.path.join(LEADERBOARD_FOLDER, existing)
 
@@ -65,7 +65,6 @@ def upload_leaderboard():
             continue
 
         try:
-            existing_attempt = int(existing_parts[-1])
             existing_level = existing_parts[-2]
             existing_levelset = existing_parts[-3]
             existing_player = "_".join(existing_parts[1:-3])
@@ -76,14 +75,8 @@ def upload_leaderboard():
             continue
 
         if existing_prefix == prefix:
-            print(f"🔍 Found match: {existing}")
-
-            if existing_attempt <= new_attempt:
-                os.remove(path)
-                print(f"🗑️ Deleted old: {existing}")
-            else:
-                print(f"⛔ Newer version exists: {existing}")
-                return "Newer version already exists", 409
+            os.remove(path)
+            print(f"🗑️ Deleted old: {existing}")
 
     # --- SAVE NEW FILE ---
     save_path = os.path.join(LEADERBOARD_FOLDER, filename)
