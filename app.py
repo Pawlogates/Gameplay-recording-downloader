@@ -14,16 +14,62 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @app.route('/leaderboard/upload', methods=['POST'])
 def upload_leaderboard():
-	if 'file' not in request.files:
-		return "No file", 400
+    if 'file' not in request.files:
+        return "No file", 400
 
-	file = request.files['file']
+    file = request.files['file']
 
-	if file.filename == '':
-		return "Empty filename", 400
+    if file.filename == '':
+        return "Empty filename", 400
 
-	file.save(os.path.join(LEADERBOARD_FOLDER, file.filename))
-	return "ok", 200
+    filename = file.filename
+
+    # --- PARSE FILENAME ---
+    try:
+        name, ext = os.path.splitext(filename)
+        parts = name.split("_")
+
+        # playback_<player>_<levelset>_<level>_<attempt>
+        if len(parts) < 5:
+            return "Invalid filename format", 400
+
+        prefix = "_".join(parts[:-1])  # everything except attempt
+        new_attempt = int(parts[-1])
+
+    except Exception:
+        return "Filename parsing error", 400
+
+    # --- DELETE OLD VERSIONS ---
+    for existing in os.listdir(LEADERBOARD_FOLDER):
+        if not existing.endswith(".json"):
+            continue
+
+        existing_name = os.path.splitext(existing)[0]
+        existing_parts = existing_name.split("_")
+
+        if len(existing_parts) < 5:
+            continue
+
+        existing_prefix = "_".join(existing_parts[:-1])
+
+        if existing_prefix == prefix:
+            existing_attempt = int(existing_parts[-1])
+
+            # delete older OR equal versions
+            if existing_attempt <= new_attempt:
+                os.remove(os.path.join(LEADERBOARD_FOLDER, existing))
+                print(f"🗑️ Deleted old: {existing}")
+
+            else:
+                # if somehow server has a newer one → reject upload
+                return "Newer version already exists", 409
+
+    # --- SAVE NEW FILE ---
+    save_path = os.path.join(LEADERBOARD_FOLDER, filename)
+    file.save(save_path)
+
+    print(f"✅ Saved: {filename}")
+    return "ok", 200
 	
 @app.route('/leaderboard/list')
 def leaderboard_list():
